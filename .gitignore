@@ -1,0 +1,19 @@
+**/build/
+build/
+.dart_tool/
+.packages
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+android/.gradle/
+android/local.properties
+**/*.iml
+pubspec.lock
+# IDE
+.idea/
+.vscode/
+# Logs
+*.log
+# Audio assets ignored (keep placeholder)
+assets/audio/*.mp3
