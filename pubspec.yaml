@@ -1,0 +1,34 @@
+name: batchmate_mobile
+description: Medha AI BatchMate Mobile App
+publish_to: 'none'
+version: 0.1.0+1
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.10.5+9
+  http: ^1.1.0
+  qr_code_scanner: ^1.0.1
+  image: ^4.1.3
+  shared_preferences: ^2.2.2
+  web_socket_channel: ^2.4.0
+  permission_handler: ^11.0.1
+  speech_to_text: ^6.3.0
+  audioplayers: ^5.2.1
+  uuid: ^4.1.0
+  provider: ^6.0.5
+
+  # Material 3
+  flutter_material_color_picker: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/
