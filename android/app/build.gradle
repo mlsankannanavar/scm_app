@@ -45,7 +45,8 @@ android {
 
     defaultConfig {
         applicationId "com.medha.batchmate"
-        minSdkVersion flutter.minSdkVersion
+        // Explicitly set minSdkVersion to 21 due to speech_to_text plugin requirement (was 19 via flutter.minSdkVersion)
+        minSdkVersion 21
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
