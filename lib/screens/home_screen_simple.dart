@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/connection_provider.dart';
 import '../theme/app_theme.dart';
 import 'camera_screen.dart';
 import 'qr_scanner_screen.dart';
@@ -14,6 +15,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Test connection when the home screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
+      connectionProvider.testConnection();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,8 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             
             // Session Status Card
-            Consumer<SessionProvider>(
-              builder: (context, sessionProvider, child) {
+            Consumer2<SessionProvider, ConnectionProvider>(
+              builder: (context, sessionProvider, connectionProvider, child) {
                 return Card(
                   elevation: 3,
                   shape: RoundedRectangleBorder(
@@ -149,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildStatusRow('Session ID', sessionProvider.sessionId ?? 'Not set'),
                         _buildStatusRow('Images Captured', '0'),
                         _buildStatusRow('Status', sessionProvider.sessionId != null ? 'Active' : 'Inactive'),
+                        _buildStatusRow('Connection', '${connectionProvider.statusIcon} ${connectionProvider.statusText}'),
                       ],
                     ),
                   ),
@@ -181,11 +193,26 @@ class _HomeScreenState extends State<HomeScreen> {
               title: 'QR Scanner',
               subtitle: 'Scan QR codes for batch info',
               color: AppTheme.secondaryColor,
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                final result = await Navigator.push<String>(
                   context,
                   MaterialPageRoute(builder: (context) => const QRScannerScreen()),
                 );
+                
+                if (result != null && result.isNotEmpty) {
+                  final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+                  await sessionProvider.saveSession(result);
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Session ID set: $result'),
+                        backgroundColor: AppTheme.successColor,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
               },
             ),
             
