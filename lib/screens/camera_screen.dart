@@ -3,6 +3,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/connection_provider.dart';
+import '../theme/app_theme.dart';
 import '../services/camera_service.dart';
 import '../utils/image_utils.dart';
 import '../models/capture_data.dart';
@@ -63,25 +65,6 @@ class _CameraScreenState extends State<CameraScreen> {
     DebugScreen.addLog('CAPTURE: Started image capture for session: $session');
     
     try {
-      // Test connectivity first
-      if (mounted) {
-        setState(() => _statusMessage = 'Testing connection...');
-      }
-      DebugScreen.addLog('API: Testing server connectivity...');
-      final isConnected = await _api.testConnectivity();
-      if (!isConnected) {
-        DebugScreen.addLog('API: ❌ Server connectivity test failed');
-        if (mounted) {
-          setState(() => _statusMessage = 'Server unreachable. Check internet connection.');
-        }
-        return;
-      }
-      DebugScreen.addLog('API: ✅ Server connectivity test passed');
-      
-      if (mounted) {
-        setState(() => _statusMessage = 'Capturing image...');
-      }
-
       print('Starting image capture...');
       DebugScreen.addLog('CAPTURE: Calling camera service...');
       final file = await _cameraService.takePicture();
@@ -309,20 +292,64 @@ class _CameraScreenState extends State<CameraScreen> {
                     icon: const Icon(Icons.close, color: Colors.white, size: 28),
                   ),
                 ),
-                if (_statusMessage != null)
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(20),
+                // Connection Status and Status Message
+                Column(
+                  children: [
+                    // Connection Status
+                    Consumer<ConnectionProvider>(
+                      builder: (context, connectionProvider, child) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: connectionProvider.status == ConnectionStatus.connected
+                                ? AppTheme.successColor.withOpacity(0.9)
+                                : AppTheme.errorColor.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                connectionProvider.status == ConnectionStatus.connected
+                                    ? Icons.wifi
+                                    : connectionProvider.status == ConnectionStatus.testing
+                                        ? Icons.sync
+                                        : Icons.wifi_off,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                connectionProvider.statusText,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    child: Text(
-                      _statusMessage!,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                    if (_statusMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _statusMessage!,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.black54,

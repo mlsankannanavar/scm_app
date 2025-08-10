@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/session_provider.dart';
+import 'providers/connection_provider.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const BatchMateApp());
@@ -15,11 +17,13 @@ class BatchMateApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SessionProvider()..loadSavedSession()),
+        ChangeNotifierProvider(create: (_) => ConnectionProvider()),
       ],
       child: MaterialApp(
         title: 'BatchMate',
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo), useMaterial3: true),
+        theme: AppTheme.lightTheme,
         home: const HomeScreen(),
+        debugShowCheckedModeBanner: false,
       ),
     );
   }
