@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import '../screens/debug_screen.dart';
 
 class ApiService {
-  static const String _baseUrl = 'https://test-batchmate.medha-analytics.ai';
+  static const String _baseUrl = 'https://test-backend-batchmate.medha-analytics.ai';
   final http.Client _client;
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();

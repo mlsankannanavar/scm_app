@@ -37,7 +37,10 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   String _generateCaptureId() {
-    return 'cap-${DateTime.now().millisecondsSinceEpoch}-${const Uuid().v4().substring(0, 8)}';
+    // Match exact web app format: 'cap-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = (DateTime.now().microsecondsSinceEpoch % 1000000).toRadixString(36);
+    return 'cap-$timestamp-$random';
   }
 
   Future<void> _captureImage() async {
@@ -68,35 +71,45 @@ class _CameraScreenState extends State<CameraScreen> {
       print('Image optimized, size: ${optimized.length} characters');
       DebugScreen.addLog('CAPTURE: Image optimized, base64 length: ${optimized.length}');
       
+      final captureId = _generateCaptureId();
+      DebugScreen.addLog('CAPTURE: Generated capture ID: $captureId');
+      
+      // Step 1: Submit initial image (like web app)
+      setState(() => _statusMessage = 'Sending image to server...');
+      DebugScreen.addLog('API: Submitting initial image (web app step 1)...');
+      
+      final initialCapture = CaptureData(
+        captureId: captureId,
+        sessionId: session,
+        imageBase64: optimized,
+        timestamp: DateTime.now(),
+      );
+      
+      final initialResponse = await _api.submitImage(initialCapture.toInitialJson());
+      DebugScreen.addLog('API: Initial image submission - Response: ${initialResponse.statusCode}');
+      
+      // Step 2: Get quantity from user
       setState(() => _statusMessage = 'Enter quantity...');
       DebugScreen.addLog('CAPTURE: Showing quantity dialog...');
-      // Show quantity input dialog
       final quantity = await _showQuantityDialog();
       
       if (quantity != null) {
-        setState(() => _statusMessage = 'Submitting to server...');
-        final captureId = _generateCaptureId();
-        DebugScreen.addLog('CAPTURE: Generated capture ID: $captureId');
+        // Step 3: Submit final data with quantity (like web app final submit)
+        setState(() => _statusMessage = 'Submitting final data...');
         DebugScreen.addLog('CAPTURE: Quantity entered: ${quantity.isEmpty ? 'None' : quantity}');
+        DebugScreen.addLog('API: Submitting final data with quantity (web app step 2)...');
         
-        final capture = CaptureData(
+        final finalCapture = CaptureData(
           captureId: captureId,
           sessionId: session,
           imageBase64: optimized,
-          timestamp: DateTime.now(),
+          timestamp: DateTime.now(), // Fresh timestamp for final submission
           quantity: quantity.isEmpty ? null : quantity,
         );
         
-        print('Submitting capture: $captureId for session: $session');
-        print('Image size: ${optimized.length}, Quantity: ${quantity.isEmpty ? 'None' : quantity}');
-        DebugScreen.addLog('API: Attempting submission to backend...');
-        DebugScreen.addLog('API: URL = https://test-backend-batchmate.medha-analytics.ai:9099/api/submit');
-        
-        final response = await _api.submitImage(capture.toJson());
-        print('Submission response received');
-        DebugScreen.addLog('API: SUCCESS - Response received from server');
-        DebugScreen.addLog('API: Response status: ${response.statusCode}');
-        DebugScreen.addLog('API: Response body: ${response.body}');
+        final finalResponse = await _api.submitImage(finalCapture.toFinalJson());
+        DebugScreen.addLog('API: Final submission - Response: ${finalResponse.statusCode}');
+        DebugScreen.addLog('API: Final response body: ${finalResponse.body}');
         
         setState(() => _statusMessage = 'Success! ID: $captureId');
         DebugScreen.addLog('CAPTURE: ✅ COMPLETE - Capture $captureId submitted successfully');

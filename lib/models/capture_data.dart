@@ -13,11 +13,18 @@ class CaptureData {
     this.quantity,
   });
 
-  Map<String, dynamic> toJson() => {
+  // First submission - image only (like web app initial capture)
+  Map<String, dynamic> toInitialJson() => {
         'captureId': captureId,
         'sessionId': sessionId,
         'image': imageBase64,
+      };
+
+  // Final submission - with quantity (like web app final submit)
+  Map<String, dynamic> toFinalJson() => {
+        'quantity': quantity ?? '',
+        'sessionId': sessionId,
+        'captureId': captureId,
         'submitTimestamp': timestamp.millisecondsSinceEpoch,
-        if (quantity != null) 'quantity': quantity,
       };
 }
