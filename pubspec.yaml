@@ -19,7 +19,6 @@ dependencies:
   audioplayers: ^5.2.1
   uuid: ^4.1.0
   provider: ^6.0.5
-  flutter_svg: ^2.0.7
 
   # Material 3
   flutter_material_color_picker: ^1.1.0
