@@ -4,11 +4,7 @@ import 'package:flutter/services.dart';
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
 
-  @override
-  State<DebugScreen> createState() => _DebugScreenState();
-}
-
-class _DebugScreenState extends State<DebugScreen> {
+  // Static methods accessible from anywhere
   static final List<String> _logs = [];
   
   static void addLog(String message) {
@@ -24,6 +20,12 @@ class _DebugScreenState extends State<DebugScreen> {
   }
 
   @override
+  State<DebugScreen> createState() => _DebugScreenState();
+}
+
+class _DebugScreenState extends State<DebugScreen> {
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -32,14 +34,14 @@ class _DebugScreenState extends State<DebugScreen> {
           IconButton(
             onPressed: () {
               setState(() {
-                clearLogs();
+                DebugScreen.clearLogs();
               });
             },
             icon: const Icon(Icons.clear_all),
           ),
           IconButton(
             onPressed: () {
-              final allLogs = _logs.join('\n');
+              final allLogs = DebugScreen._logs.join('\n');
               Clipboard.setData(ClipboardData(text: allLogs));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Logs copied to clipboard')),
@@ -49,7 +51,7 @@ class _DebugScreenState extends State<DebugScreen> {
           ),
         ],
       ),
-      body: _logs.isEmpty
+      body: DebugScreen._logs.isEmpty
           ? const Center(
               child: Text(
                 'No logs yet.\nPerform actions in the app to see debug information.',
@@ -59,9 +61,9 @@ class _DebugScreenState extends State<DebugScreen> {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(8),
-              itemCount: _logs.length,
+              itemCount: DebugScreen._logs.length,
               itemBuilder: (context, index) {
-                final log = _logs[index];
+                final log = DebugScreen._logs[index];
                 final isError = log.toLowerCase().contains('error') || 
                                log.toLowerCase().contains('failed') ||
                                log.toLowerCase().contains('exception');
