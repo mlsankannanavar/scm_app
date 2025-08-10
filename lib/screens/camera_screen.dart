@@ -42,24 +42,31 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _captureImage() async {
     final session = context.read<SessionProvider>().sessionId;
     if (session == null || session.isEmpty) {
-      setState(() => _statusMessage = 'Set session first');
+      setState(() => _statusMessage = 'Please set session ID first');
       return;
     }
     if (_busy) return;
     
     setState(() {
       _busy = true;
-      _statusMessage = 'Capturing...';
+      _statusMessage = 'Capturing image...';
     });
     
     try {
+      print('Starting image capture...');
       final file = await _cameraService.takePicture();
-      final optimized = await optimizeImage(File(file.path));
+      print('Image captured: ${file.path}');
       
+      setState(() => _statusMessage = 'Processing image...');
+      final optimized = await optimizeImage(File(file.path));
+      print('Image optimized, size: ${optimized.length} characters');
+      
+      setState(() => _statusMessage = 'Enter quantity...');
       // Show quantity input dialog
       final quantity = await _showQuantityDialog();
       
       if (quantity != null) {
+        setState(() => _statusMessage = 'Submitting to server...');
         final captureId = _generateCaptureId();
         final capture = CaptureData(
           captureId: captureId,
@@ -69,13 +76,38 @@ class _CameraScreenState extends State<CameraScreen> {
           quantity: quantity.isEmpty ? null : quantity,
         );
         
-        await _api.submitImage(capture.toJson());
-        setState(() => _statusMessage = 'Submitted $captureId');
+        print('Submitting capture: $captureId for session: $session');
+        print('Image size: ${optimized.length}, Quantity: ${quantity.isEmpty ? 'None' : quantity}');
+        
+        final response = await _api.submitImage(capture.toJson());
+        print('Submission response received');
+        
+        setState(() => _statusMessage = 'Success! ID: $captureId');
+        
+        // Auto-clear status after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => _statusMessage = null);
+          }
+        });
       } else {
-        setState(() => _statusMessage = 'Cancelled');
+        setState(() => _statusMessage = 'Capture cancelled');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() => _statusMessage = null);
+          }
+        });
       }
     } catch (e) {
-      setState(() => _statusMessage = 'Error: $e');
+      print('Error during capture/submit: $e');
+      setState(() => _statusMessage = 'Failed: ${e.toString()}');
+      
+      // Show error for longer time
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted) {
+          setState(() => _statusMessage = null);
+        }
+      });
     } finally {
       setState(() => _busy = false);
     }
