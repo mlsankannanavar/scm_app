@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import 'camera_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'debug_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,6 +59,18 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DebugScreen()),
+              );
+            },
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Debug Logs',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -8,6 +8,7 @@ import '../utils/image_utils.dart';
 import '../models/capture_data.dart';
 import '../services/api_service.dart';
 import 'package:uuid/uuid.dart';
+import 'debug_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -43,6 +44,7 @@ class _CameraScreenState extends State<CameraScreen> {
     final session = context.read<SessionProvider>().sessionId;
     if (session == null || session.isEmpty) {
       setState(() => _statusMessage = 'Please set session ID first');
+      DebugScreen.addLog('ERROR: No session ID set');
       return;
     }
     if (_busy) return;
@@ -51,23 +53,32 @@ class _CameraScreenState extends State<CameraScreen> {
       _busy = true;
       _statusMessage = 'Capturing image...';
     });
+    DebugScreen.addLog('CAPTURE: Started image capture for session: $session');
     
     try {
       print('Starting image capture...');
+      DebugScreen.addLog('CAPTURE: Calling camera service...');
       final file = await _cameraService.takePicture();
       print('Image captured: ${file.path}');
+      DebugScreen.addLog('CAPTURE: Image saved to ${file.path}');
       
       setState(() => _statusMessage = 'Processing image...');
+      DebugScreen.addLog('CAPTURE: Starting image optimization...');
       final optimized = await optimizeImage(File(file.path));
       print('Image optimized, size: ${optimized.length} characters');
+      DebugScreen.addLog('CAPTURE: Image optimized, base64 length: ${optimized.length}');
       
       setState(() => _statusMessage = 'Enter quantity...');
+      DebugScreen.addLog('CAPTURE: Showing quantity dialog...');
       // Show quantity input dialog
       final quantity = await _showQuantityDialog();
       
       if (quantity != null) {
         setState(() => _statusMessage = 'Submitting to server...');
         final captureId = _generateCaptureId();
+        DebugScreen.addLog('CAPTURE: Generated capture ID: $captureId');
+        DebugScreen.addLog('CAPTURE: Quantity entered: ${quantity.isEmpty ? 'None' : quantity}');
+        
         final capture = CaptureData(
           captureId: captureId,
           sessionId: session,
@@ -78,11 +89,17 @@ class _CameraScreenState extends State<CameraScreen> {
         
         print('Submitting capture: $captureId for session: $session');
         print('Image size: ${optimized.length}, Quantity: ${quantity.isEmpty ? 'None' : quantity}');
+        DebugScreen.addLog('API: Attempting submission to backend...');
+        DebugScreen.addLog('API: URL = https://test-backend-batchmate.medha-analytics.ai:9099/api/submit');
         
         final response = await _api.submitImage(capture.toJson());
         print('Submission response received');
+        DebugScreen.addLog('API: SUCCESS - Response received from server');
+        DebugScreen.addLog('API: Response status: ${response.statusCode}');
+        DebugScreen.addLog('API: Response body: ${response.body}');
         
         setState(() => _statusMessage = 'Success! ID: $captureId');
+        DebugScreen.addLog('CAPTURE: ✅ COMPLETE - Capture $captureId submitted successfully');
         
         // Auto-clear status after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
@@ -92,6 +109,7 @@ class _CameraScreenState extends State<CameraScreen> {
         });
       } else {
         setState(() => _statusMessage = 'Capture cancelled');
+        DebugScreen.addLog('CAPTURE: User cancelled quantity input');
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             setState(() => _statusMessage = null);
@@ -101,6 +119,7 @@ class _CameraScreenState extends State<CameraScreen> {
     } catch (e) {
       print('Error during capture/submit: $e');
       setState(() => _statusMessage = 'Failed: ${e.toString()}');
+      DebugScreen.addLog('ERROR: Capture failed - ${e.toString()}');
       
       // Show error for longer time
       Future.delayed(const Duration(seconds: 5), () {
