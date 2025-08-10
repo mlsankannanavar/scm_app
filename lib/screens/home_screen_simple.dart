@@ -146,9 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        _buildStatusRow('Batch ID', sessionProvider.batchId ?? 'Not set'),
-                        _buildStatusRow('Images Captured', '${sessionProvider.capturedImages.length}'),
-                        _buildStatusRow('Status', sessionProvider.isActive ? 'Active' : 'Inactive'),
+                        _buildStatusRow('Session ID', sessionProvider.sessionId ?? 'Not set'),
+                        _buildStatusRow('Images Captured', '0'),
+                        _buildStatusRow('Status', sessionProvider.sessionId != null ? 'Active' : 'Inactive'),
                       ],
                     ),
                   ),
@@ -184,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const QrScannerScreen()),
+                  MaterialPageRoute(builder: (context) => const QRScannerScreen()),
                 );
               },
             ),
@@ -317,3 +317,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
