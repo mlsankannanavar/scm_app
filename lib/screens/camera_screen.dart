@@ -81,8 +81,7 @@ class _CameraScreenState extends State<CameraScreen> {
       if (mounted) {
         setState(() => _statusMessage = 'Capturing image...');
       }
-    
-    try {
+
       print('Starting image capture...');
       DebugScreen.addLog('CAPTURE: Calling camera service...');
       final file = await _cameraService.takePicture();

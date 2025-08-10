@@ -2,9 +2,6 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import '../screens/debug_screen.dart;rt 'dart:convert';
-import 'dart:async';
-import 'package:http/http.dart' as http;
 import '../screens/debug_screen.dart';
 
 class ApiService {
