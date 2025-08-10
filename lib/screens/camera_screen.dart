@@ -46,17 +46,41 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _captureImage() async {
     final session = context.read<SessionProvider>().sessionId;
     if (session == null || session.isEmpty) {
-      setState(() => _statusMessage = 'Please set session ID first');
+      if (mounted) {
+        setState(() => _statusMessage = 'Please set session ID first');
+      }
       DebugScreen.addLog('ERROR: No session ID set');
       return;
     }
     if (_busy) return;
     
-    setState(() {
-      _busy = true;
-      _statusMessage = 'Capturing image...';
-    });
+    if (mounted) {
+      setState(() {
+        _busy = true;
+        _statusMessage = 'Capturing image...';
+      });
+    }
     DebugScreen.addLog('CAPTURE: Started image capture for session: $session');
+    
+    try {
+      // Test connectivity first
+      if (mounted) {
+        setState(() => _statusMessage = 'Testing connection...');
+      }
+      DebugScreen.addLog('API: Testing server connectivity...');
+      final isConnected = await _api.testConnectivity();
+      if (!isConnected) {
+        DebugScreen.addLog('API: ❌ Server connectivity test failed');
+        if (mounted) {
+          setState(() => _statusMessage = 'Server unreachable. Check internet connection.');
+        }
+        return;
+      }
+      DebugScreen.addLog('API: ✅ Server connectivity test passed');
+      
+      if (mounted) {
+        setState(() => _statusMessage = 'Capturing image...');
+      }
     
     try {
       print('Starting image capture...');
@@ -65,7 +89,9 @@ class _CameraScreenState extends State<CameraScreen> {
       print('Image captured: ${file.path}');
       DebugScreen.addLog('CAPTURE: Image saved to ${file.path}');
       
-      setState(() => _statusMessage = 'Processing image...');
+      if (mounted) {
+        setState(() => _statusMessage = 'Processing image...');
+      }
       DebugScreen.addLog('CAPTURE: Starting image optimization...');
       final optimized = await optimizeImage(File(file.path));
       print('Image optimized, size: ${optimized.length} characters');
@@ -75,7 +101,9 @@ class _CameraScreenState extends State<CameraScreen> {
       DebugScreen.addLog('CAPTURE: Generated capture ID: $captureId');
       
       // Step 1: Submit initial image (like web app)
-      setState(() => _statusMessage = 'Sending image to server...');
+      if (mounted) {
+        setState(() => _statusMessage = 'Sending image to server...');
+      }
       DebugScreen.addLog('API: Submitting initial image (web app step 1)...');
       
       final initialCapture = CaptureData(
@@ -89,13 +117,17 @@ class _CameraScreenState extends State<CameraScreen> {
       DebugScreen.addLog('API: Initial image submission - Response: ${initialResponse.statusCode}');
       
       // Step 2: Get quantity from user
-      setState(() => _statusMessage = 'Enter quantity...');
+      if (mounted) {
+        setState(() => _statusMessage = 'Enter quantity...');
+      }
       DebugScreen.addLog('CAPTURE: Showing quantity dialog...');
       final quantity = await _showQuantityDialog();
       
       if (quantity != null) {
         // Step 3: Submit final data with quantity (like web app final submit)
-        setState(() => _statusMessage = 'Submitting final data...');
+        if (mounted) {
+          setState(() => _statusMessage = 'Submitting final data...');
+        }
         DebugScreen.addLog('CAPTURE: Quantity entered: ${quantity.isEmpty ? 'None' : quantity}');
         DebugScreen.addLog('API: Submitting final data with quantity (web app step 2)...');
         
@@ -111,7 +143,9 @@ class _CameraScreenState extends State<CameraScreen> {
         DebugScreen.addLog('API: Final submission - Response: ${finalResponse.statusCode}');
         DebugScreen.addLog('API: Final response body: ${finalResponse.body}');
         
-        setState(() => _statusMessage = 'Success! ID: $captureId');
+        if (mounted) {
+          setState(() => _statusMessage = 'Success! ID: $captureId');
+        }
         DebugScreen.addLog('CAPTURE: ✅ COMPLETE - Capture $captureId submitted successfully');
         
         // Auto-clear status after 3 seconds
@@ -121,7 +155,9 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         });
       } else {
-        setState(() => _statusMessage = 'Capture cancelled');
+        if (mounted) {
+          setState(() => _statusMessage = 'Capture cancelled');
+        }
         DebugScreen.addLog('CAPTURE: User cancelled quantity input');
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
@@ -131,8 +167,23 @@ class _CameraScreenState extends State<CameraScreen> {
       }
     } catch (e) {
       print('Error during capture/submit: $e');
-      setState(() => _statusMessage = 'Failed: ${e.toString()}');
       DebugScreen.addLog('ERROR: Capture failed - ${e.toString()}');
+      
+      // Create user-friendly error messages
+      String userMessage = 'Capture failed';
+      if (e.toString().contains('TimeoutException')) {
+        userMessage = 'Server timeout - please try again';
+      } else if (e.toString().contains('SocketException')) {
+        userMessage = 'Network error - check internet connection';
+      } else if (e.toString().contains('Connection refused')) {
+        userMessage = 'Server unavailable - try again later';
+      } else if (e.toString().contains('POST /api/submit failed')) {
+        userMessage = 'Upload failed - server may be busy';
+      }
+      
+      if (mounted) {
+        setState(() => _statusMessage = userMessage);
+      }
       
       // Show error for longer time
       Future.delayed(const Duration(seconds: 5), () {
@@ -141,7 +192,9 @@ class _CameraScreenState extends State<CameraScreen> {
         }
       });
     } finally {
-      setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 

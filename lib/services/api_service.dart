@@ -1,5 +1,9 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import '../screens/debug_screen.dart;rt 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../screens/debug_screen.dart';
 
@@ -23,7 +27,7 @@ class ApiService {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
-        ).timeout(const Duration(seconds: 30));
+        ).timeout(const Duration(seconds: 15)); // Reduced from 30 to 15 seconds
         
         print('Response status: ${resp.statusCode}');
         print('Response body: ${resp.body}');
@@ -40,10 +44,23 @@ class ApiService {
         }
       } catch (e) {
         print('POST attempt ${attempt + 1} failed: $e');
-        DebugScreen.addLog('API: ❌ Attempt ${attempt + 1} failed: $e');
+        String errorMsg = e.toString();
+        
+        // Better error messages for common network issues
+        if (e is SocketException) {
+          errorMsg = "Network connection failed. Please check your internet connection.";
+        } else if (e is TimeoutException) {
+          errorMsg = "Request timed out. Server may be slow or unreachable.";
+        } else if (e is HttpException) {
+          errorMsg = "HTTP error: ${e.message}";
+        }
+        
+        DebugScreen.addLog('API: ❌ Attempt ${attempt + 1} failed: $errorMsg');
+        
         if (attempt < 2) {
-          await Future.delayed(Duration(milliseconds: 1000 * (attempt + 1)));
-          DebugScreen.addLog('API: Retrying in ${1000 * (attempt + 1)}ms...');
+          final delay = Duration(milliseconds: 2000 * (attempt + 1)); // Increased delay between retries
+          await Future.delayed(delay);
+          DebugScreen.addLog('API: Retrying in ${delay.inMilliseconds}ms...');
         }
       }
     }
@@ -81,5 +98,22 @@ class ApiService {
   Future<Map<String, dynamic>> getStatus(String sessionId) async {
     final r = await _get('/api/status/$sessionId');
     return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  // Simple connectivity test
+  Future<bool> testConnectivity() async {
+    try {
+      DebugScreen.addLog('API: Testing connectivity to $_baseUrl...');
+      final response = await _client.get(
+        Uri.parse('$_baseUrl/'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      
+      DebugScreen.addLog('API: Connectivity test - Status: ${response.statusCode}');
+      return response.statusCode < 500; // Accept any non-server-error response
+    } catch (e) {
+      DebugScreen.addLog('API: ❌ Connectivity test failed: $e');
+      return false;
+    }
   }
 }
