@@ -47,8 +47,8 @@ class LocalOcrService {
     try {
       final inputImage = InputImage.fromBytes(
         bytes: imageBytes,
-        metadata: const InputImageMetadata(
-          size: Size(640, 480), // Default size
+        metadata: InputImageMetadata(
+          size: const Size(640, 480), // Default size
           rotation: InputImageRotation.rotation0deg,
           format: InputImageFormat.nv21,
           bytesPerRow: 640,
