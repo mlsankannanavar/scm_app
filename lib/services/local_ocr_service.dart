@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:string_similarity/string_similarity.dart';
 import 'package:intl/intl.dart';
@@ -240,6 +241,62 @@ class LocalOcrService {
     return formats;
   }
 
+  /// Find best batch match from a list of LocalBatchData objects
+  Future<BatchMatchResult> findBestBatchMatch(String extractedText, List<LocalBatchData> batches) async {
+    if (batches.isEmpty) {
+      print('🔍 LOCAL_OCR: No batches available for matching');
+      return BatchMatchResult(batchNumber: '', confidence: 0.0);
+    }
+
+    final cleanText = extractedText.toUpperCase().replaceAll(RegExp(r'[^\w\s]'), ' ');
+    print('🔍 LOCAL_OCR: Searching for batch numbers in: ${cleanText.substring(0, cleanText.length > 100 ? 100 : cleanText.length)}...');
+
+    String bestMatch = '';
+    double bestConfidence = 0.0;
+
+    // Step 1: Check for exact matches first
+    for (final batch in batches) {
+      final batchNumber = batch.batchNumber.toUpperCase();
+      
+      if (cleanText.contains(batchNumber)) {
+        print('🔍 LOCAL_OCR: Found exact match: ${batch.batchNumber}');
+        return BatchMatchResult(
+          batchNumber: batch.batchNumber,
+          confidence: 1.0,
+        );
+      }
+    }
+
+    // Step 2: Check for partial matches with similarity scoring
+    for (final batch in batches) {
+      final batchNumber = batch.batchNumber.toUpperCase();
+      
+      // Check if any word in the text is similar to the batch number
+      final words = cleanText.split(RegExp(r'\s+'));
+      for (final word in words) {
+        if (word.length >= 3) { // Only check words with at least 3 characters
+          final similarity = batchNumber.similarityTo(word);
+          
+          if (similarity > bestConfidence && similarity > 0.7) { // Minimum 70% similarity
+            bestMatch = batch.batchNumber;
+            bestConfidence = similarity;
+          }
+        }
+      }
+    }
+
+    if (bestMatch.isNotEmpty) {
+      print('🔍 LOCAL_OCR: Found similarity match: $bestMatch (confidence: ${bestConfidence.toStringAsFixed(2)})');
+      return BatchMatchResult(
+        batchNumber: bestMatch,
+        confidence: bestConfidence,
+      );
+    }
+
+    print('🔍 LOCAL_OCR: No batch number found in extracted text');
+    return BatchMatchResult(batchNumber: '', confidence: 0.0);
+  }
+
   /// Dispose of resources
   Future<void> dispose() async {
     if (_isInitialized) {
@@ -248,4 +305,15 @@ class LocalOcrService {
       print('🔍 LOCAL_OCR: Disposed text recognizer');
     }
   }
+}
+
+/// Result of batch matching operation
+class BatchMatchResult {
+  final String batchNumber;
+  final double confidence;
+
+  BatchMatchResult({
+    required this.batchNumber,
+    required this.confidence,
+  });
 }

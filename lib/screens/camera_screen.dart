@@ -182,37 +182,6 @@ class _CameraScreenState extends State<CameraScreen> {
       });
     }
   }
-      print('Error during capture/submit: $e');
-      DebugScreen.addLog('ERROR: Capture failed - ${e.toString()}');
-      
-      // Create user-friendly error messages
-      String userMessage = 'Capture failed';
-      if (e.toString().contains('TimeoutException')) {
-        userMessage = 'Server timeout - please try again';
-      } else if (e.toString().contains('SocketException')) {
-        userMessage = 'Network error - check internet connection';
-      } else if (e.toString().contains('Connection refused')) {
-        userMessage = 'Server unavailable - try again later';
-      } else if (e.toString().contains('POST /api/submit failed')) {
-        userMessage = 'Upload failed - server may be busy';
-      }
-      
-      if (mounted) {
-        setState(() => _statusMessage = userMessage);
-      }
-      
-      // Show error for longer time
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() => _statusMessage = null);
-        }
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
-  }
 
   Future<String?> _showQuantityDialog({String? batchNumber}) async {
     final TextEditingController quantityController = TextEditingController();
