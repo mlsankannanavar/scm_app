@@ -15,15 +15,27 @@ class SessionDataService {
   /// Download session data from server
   Future<SessionBatchData?> downloadSessionData(String sessionId) async {
     try {
-      print('📡 SESSION_DATA: Downloading data for session $sessionId');
+      final endpoint = '$baseUrl/api/session-data/$sessionId';
+      print('📡 SESSION_API: Requesting batch data from server');
+      print('📡 SESSION_API: Endpoint: GET $endpoint');
+      print('📡 SESSION_API: Session ID: $sessionId');
+      print('📡 SESSION_API: Headers: Content-Type: application/json');
       
+      final startTime = DateTime.now();
       final response = await http.get(
-        Uri.parse('$baseUrl/api/session-data/$sessionId'),
+        Uri.parse(endpoint),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 30));
+      final responseTime = DateTime.now().difference(startTime).inMilliseconds;
+
+      print('📡 SESSION_API: Response received in ${responseTime}ms');
+      print('📡 SESSION_API: Status Code: ${response.statusCode}');
+      print('📡 SESSION_API: Response Size: ${response.body.length} characters');
 
       if (response.statusCode == 200) {
+        print('📡 SESSION_API: ✅ Success response received');
         final data = jsonDecode(response.body);
+        print('📡 SESSION_API: Response Body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}${response.body.length > 500 ? '...' : ''}');
         
         if (data['success'] == true) {
           final sessionData = SessionBatchData.fromServerResponse(sessionId, data);
@@ -31,21 +43,27 @@ class SessionDataService {
           // Store locally for offline use
           await _database.storeSessionData(sessionData);
           
-          print('✅ SESSION_DATA: Downloaded ${sessionData.totalBatches} batches for session $sessionId');
+          print('📡 SESSION_API: ✅ Downloaded ${sessionData.totalBatches} batches for session $sessionId');
+          print('📡 SESSION_API: ✅ Data stored locally for offline use');
           return sessionData;
         } else {
-          print('❌ SESSION_DATA: Server error: ${data['message']}');
+          print('📡 SESSION_API: ❌ Server returned success=false');
+          print('📡 SESSION_API: ❌ Error message: ${data['message']}');
           return null;
         }
       } else if (response.statusCode == 404) {
-        print('❌ SESSION_DATA: Session not found or no batch data available');
+        print('📡 SESSION_API: ❌ HTTP 404 - Session not found');
+        print('📡 SESSION_API: ❌ This means session has no batch data or doesn\'t exist');
+        print('📡 SESSION_API: Response Body: ${response.body}');
         return null;
       } else {
-        print('❌ SESSION_DATA: HTTP error ${response.statusCode}: ${response.body}');
+        print('📡 SESSION_API: ❌ HTTP Error ${response.statusCode}');
+        print('📡 SESSION_API: ❌ Response Body: ${response.body}');
         return null;
       }
     } catch (e) {
-      print('❌ SESSION_DATA: Network error downloading session data: $e');
+      print('📡 SESSION_API: ❌ Network/Exception Error: $e');
+      print('📡 SESSION_API: ❌ Falling back to cached data...');
       
       // Try to get cached data if network fails
       final cachedData = await _database.getSessionData(sessionId);

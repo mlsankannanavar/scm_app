@@ -48,15 +48,23 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _captureImage() async {
+    print('📱 MOBILE_OCR_WORKFLOW: Starting image capture and local OCR processing');
+    
     final session = context.read<SessionProvider>().sessionId;
     if (session == null || session.isEmpty) {
+      print('📱 MOBILE_OCR_WORKFLOW: ❌ No session ID found');
       if (mounted) {
         setState(() => _statusMessage = 'Please set session ID first');
       }
       DebugScreen.addLog('ERROR: No session ID set');
       return;
     }
-    if (_busy) return;
+    print('📱 MOBILE_OCR_WORKFLOW: Using session ID: $session');
+    
+    if (_busy) {
+      print('📱 MOBILE_OCR_WORKFLOW: ⚠️ Already processing, ignoring tap');
+      return;
+    }
     
     if (mounted) {
       setState(() {
@@ -64,49 +72,68 @@ class _CameraScreenState extends State<CameraScreen> {
         _statusMessage = 'Capturing image...';
       });
     }
+    print('📱 MOBILE_OCR_WORKFLOW: ⏳ Starting capture process...');
     DebugScreen.addLog('MOBILE_OCR: Started local image capture for session: $session');
     
     try {
-      print('🔍 Starting LOCAL OCR image capture...');
+      print('� MOBILE_OCR_WORKFLOW: STEP 1 - Image Capture');
       DebugScreen.addLog('MOBILE_OCR: Calling camera service...');
       final file = await _cameraService.takePicture();
-      print('📸 Image captured: ${file.path}');
+      print('� MOBILE_OCR_WORKFLOW: ✅ Image captured: ${file.path}');
+      print('📱 MOBILE_OCR_WORKFLOW: File size: ${await file.length()} bytes');
       DebugScreen.addLog('MOBILE_OCR: Image saved to ${file.path}');
       
       // Step 1: LOCAL OCR Processing
       if (mounted) {
         setState(() => _statusMessage = 'Processing with local OCR...');
       }
+      print('📱 MOBILE_OCR_WORKFLOW: STEP 2 - Local OCR Processing');
       DebugScreen.addLog('MOBILE_OCR: Starting local OCR text extraction...');
       
       final ocrService = LocalOcrService();
       final extractedText = await ocrService.extractTextFromImage(File(file.path));
-      print('🔍 LOCAL OCR extracted text: ${extractedText.substring(0, extractedText.length > 100 ? 100 : extractedText.length)}...');
+      print('� MOBILE_OCR_WORKFLOW: ✅ OCR completed');
+      print('📱 MOBILE_OCR_WORKFLOW: Extracted text length: ${extractedText.length} characters');
+      print('📱 MOBILE_OCR_WORKFLOW: Text preview: ${extractedText.substring(0, extractedText.length > 100 ? 100 : extractedText.length)}...');
       DebugScreen.addLog('MOBILE_OCR: Extracted text length: ${extractedText.length} characters');
       
       // Step 2: Batch Number Matching
       if (mounted) {
         setState(() => _statusMessage = 'Finding batch matches...');
       }
+      print('📱 MOBILE_OCR_WORKFLOW: STEP 3 - Batch Matching');
       DebugScreen.addLog('MOBILE_OCR: Starting batch number matching...');
       
       final batchDb = LocalBatchDatabaseService();
+      print('📱 MOBILE_OCR_WORKFLOW: Getting stored batches for session: $session');
       final sessionBatches = await batchDb.getBatchesForSession(session);
+      print('📱 MOBILE_OCR_WORKFLOW: Found ${sessionBatches.length} cached batches to match against');
+      
+      print('📱 MOBILE_OCR_WORKFLOW: ⏳ Running batch matching algorithm...');
       final matchResult = await ocrService.findBestBatchMatch(extractedText, sessionBatches);
       
+      print('📱 MOBILE_OCR_WORKFLOW: ✅ Batch matching completed');
+      print('📱 MOBILE_OCR_WORKFLOW: Best match: ${matchResult.batchNumber}');
+      print('📱 MOBILE_OCR_WORKFLOW: Match confidence: ${matchResult.confidence.toStringAsFixed(2)}');
+      
       if (matchResult.batchNumber.isNotEmpty) {
+        print('📱 MOBILE_OCR_WORKFLOW: ✅ MATCH FOUND!');
         DebugScreen.addLog('MOBILE_OCR: ✅ Batch matched: ${matchResult.batchNumber} (confidence: ${matchResult.confidence.toStringAsFixed(2)})');
-        print('✅ Batch matched: ${matchResult.batchNumber}');
         
         // Step 3: Get quantity from user
         if (mounted) {
           setState(() => _statusMessage = 'Enter quantity for ${matchResult.batchNumber}...');
         }
+        print('📱 MOBILE_OCR_WORKFLOW: STEP 4 - Quantity Input');
+        print('📱 MOBILE_OCR_WORKFLOW: Showing quantity dialog for batch: ${matchResult.batchNumber}');
         DebugScreen.addLog('MOBILE_OCR: Showing quantity dialog for batch: ${matchResult.batchNumber}');
         
         final quantity = await _showQuantityDialog(batchNumber: matchResult.batchNumber);
         
         if (quantity != null && quantity.isNotEmpty) {
+          print('📱 MOBILE_OCR_WORKFLOW: STEP 5 - Result Submission');
+          print('📱 MOBILE_OCR_WORKFLOW: User entered quantity: $quantity');
+          
           // Step 4: Submit ONLY the result to backend (not the image)
           if (mounted) {
             setState(() => _statusMessage = 'Submitting batch result...');
@@ -114,6 +141,7 @@ class _CameraScreenState extends State<CameraScreen> {
           DebugScreen.addLog('MOBILE_OCR: Quantity entered: $quantity');
           DebugScreen.addLog('MOBILE_OCR: Submitting final result to backend...');
           
+          print('📱 MOBILE_OCR_WORKFLOW: ⏳ Preparing direct submission payload...');
           final captureId = _generateCaptureId();
           final directSubmissionData = {
             'sessionId': session,
@@ -127,11 +155,20 @@ class _CameraScreenState extends State<CameraScreen> {
             'source': 'mobile_local_ocr',
           };
           
+          print('📱 MOBILE_OCR_WORKFLOW: Payload created - Keys: ${directSubmissionData.keys.toList()}');
+          print('📱 MOBILE_OCR_WORKFLOW: ⏳ Sending to backend via API service...');
+          
           final response = await _api.submitDirectResult(directSubmissionData);
+          print('📱 MOBILE_OCR_WORKFLOW: ✅ Backend response received');
+          print('📱 MOBILE_OCR_WORKFLOW: Response status: ${response.statusCode}');
+          
           DebugScreen.addLog('MOBILE_OCR: Direct submission - Response: ${response.statusCode}');
           DebugScreen.addLog('MOBILE_OCR: Response body: ${response.body}');
           
           // Step 5: Store locally and show success
+          print('📱 MOBILE_OCR_WORKFLOW: STEP 6 - Local Storage');
+          print('📱 MOBILE_OCR_WORKFLOW: ⏳ Storing capture record locally...');
+          
           await batchDb.storeCaptureRecord(
             session, 
             matchResult.batchNumber, 
@@ -139,6 +176,10 @@ class _CameraScreenState extends State<CameraScreen> {
             captureId,
             confidence: matchResult.confidence,
           );
+          
+          print('📱 MOBILE_OCR_WORKFLOW: ✅ Local storage completed');
+          print('📱 MOBILE_OCR_WORKFLOW: ✅ WORKFLOW COMPLETE!');
+          print('📱 MOBILE_OCR_WORKFLOW: Final result - Batch: ${matchResult.batchNumber}, Qty: $quantity');
           
           if (mounted) {
             setState(() => _statusMessage = '✅ Success: ${matchResult.batchNumber} (Qty: $quantity)');
@@ -148,8 +189,10 @@ class _CameraScreenState extends State<CameraScreen> {
           DebugScreen.addLog('MOBILE_OCR: ✅ COMPLETE - Local OCR batch ${matchResult.batchNumber} processed successfully');
           
         } else {
+          print('📱 MOBILE_OCR_WORKFLOW: ❌ User cancelled quantity input');
           if (mounted) {
             setState(() => _statusMessage = 'Capture cancelled');
+          }
           }
           DebugScreen.addLog('MOBILE_OCR: User cancelled quantity input');
         }
