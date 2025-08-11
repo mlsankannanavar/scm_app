@@ -15,6 +15,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _isFetchingBatches = false;
+  bool _batchesFetched = false;
+
   @override
   void initState() {
     super.initState();
@@ -23,6 +26,34 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<ConnectionProvider>().startBackgroundMonitoring();
       }
     });
+  }
+
+  Future<void> _handleQRScan() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QRScannerScreen()),
+    );
+    
+    if (result != null && mounted) {
+      // Save session to provider
+      await context.read<SessionProvider>().saveSession(result);
+      
+      // Start fetching batches
+      setState(() {
+        _isFetchingBatches = true;
+        _batchesFetched = false;
+      });
+      
+      // Simulate batch fetching (replace with actual API call)
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (mounted) {
+        setState(() {
+          _isFetchingBatches = false;
+          _batchesFetched = true;
+        });
+      }
+    }
   }
 
   @override
@@ -167,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               const SizedBox(height: 24),
               
-              // Session Status Card with Local Storage Info
+              // Session Status Card with Batch Fetching Info
               Consumer<SessionProvider>(
                 builder: (context, sessionProvider, child) {
                   return Card(
@@ -194,17 +225,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Session & Local Storage',
+                                  'Session & Batch Status',
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                              Icon(
-                                Icons.storage,
-                                color: AppTheme.secondaryColor,
-                                size: 20,
-                              ),
+                              if (_isFetchingBatches)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else if (_batchesFetched)
+                                Icon(
+                                  Icons.table_chart,
+                                  color: AppTheme.successColor,
+                                  size: 20,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -227,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 Text(
                                   sessionProvider.sessionId != null
-                                      ? 'Session Active - Ready for Local Processing'
+                                      ? 'Session Active - Local Processing Ready'
                                       : 'No Session - Scan QR to Start',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
@@ -245,24 +283,63 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.offline_pin,
-                                        size: 16,
-                                        color: AppTheme.successColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Local OCR enabled • Data stored locally',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.successColor,
-                                          fontWeight: FontWeight.w500,
+                                  if (_isFetchingBatches)
+                                    Row(
+                                      children: [
+                                        const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Fetching batch numbers...',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.warningColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else if (_batchesFetched)
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline,
+                                          size: 16,
+                                          color: AppTheme.successColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Batches fetched successfully • Local OCR enabled',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.successColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.offline_pin,
+                                          size: 16,
+                                          color: AppTheme.successColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Ready for batch data fetching',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.successColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ],
                             ),
@@ -276,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               const SizedBox(height: 32),
               
-              // Action Buttons with Enhanced Descriptions
+              // Action Buttons
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -286,14 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: double.infinity,
                       height: 70,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const QRScannerScreen(),
-                            ),
-                          );
-                        },
+                        onPressed: _handleQRScan,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.secondaryColor,
                           foregroundColor: AppTheme.primaryColor,
@@ -312,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                             Text(
-                              'Start new session',
+                              'Start new session & fetch batches',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.primaryColor.withOpacity(0.8),
@@ -325,15 +395,69 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     const SizedBox(height: 16),
                     
-                    // Camera Button with Local OCR
+                    // Batch Table Button
                     Consumer<SessionProvider>(
                       builder: (context, sessionProvider, child) {
                         final hasSession = sessionProvider.sessionId != null;
                         return SizedBox(
                           width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: hasSession && _batchesFetched
+                                ? () {
+                                    // TODO: Navigate to batch table screen
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Batch table screen coming soon!'),
+                                        backgroundColor: AppTheme.successColor,
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            icon: Icon(
+                              Icons.table_chart,
+                              size: 20,
+                              color: hasSession && _batchesFetched
+                                  ? AppTheme.secondaryColor
+                                  : AppTheme.textColor.withOpacity(0.3),
+                            ),
+                            label: Text(
+                              'View Batch Table',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: hasSession && _batchesFetched
+                                    ? AppTheme.secondaryColor
+                                    : AppTheme.textColor.withOpacity(0.3),
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: hasSession && _batchesFetched
+                                    ? AppTheme.secondaryColor
+                                    : AppTheme.borderColor,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Camera Button with Local OCR
+                    Consumer<SessionProvider>(
+                      builder: (context, sessionProvider, child) {
+                        final hasSession = sessionProvider.sessionId != null;
+                        final canCapture = hasSession && _batchesFetched;
+                        return SizedBox(
+                          width: double.infinity,
                           height: 70,
                           child: ElevatedButton(
-                            onPressed: hasSession
+                            onPressed: canCapture
                                 ? () {
                                     Navigator.push(
                                       context,
@@ -344,13 +468,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: hasSession 
+                              backgroundColor: canCapture 
                                   ? AppTheme.successColor 
                                   : AppTheme.borderColor,
-                              foregroundColor: hasSession
+                              foregroundColor: canCapture
                                   ? AppTheme.primaryColor
                                   : AppTheme.textColor.withOpacity(0.5),
-                              elevation: hasSession ? 6 : 2,
+                              elevation: canCapture ? 6 : 2,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -365,10 +489,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  hasSession ? 'Local OCR + Direct submit' : 'Requires session',
+                                  canCapture 
+                                      ? 'Local OCR + Direct submit' 
+                                      : 'Requires session & batch data',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: hasSession 
+                                    color: canCapture 
                                         ? AppTheme.primaryColor.withOpacity(0.8)
                                         : AppTheme.textColor.withOpacity(0.4),
                                   ),
