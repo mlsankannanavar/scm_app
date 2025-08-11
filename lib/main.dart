@@ -22,7 +22,7 @@ class BatchMateApp extends StatelessWidget {
       child: MaterialApp(
         title: 'BatchMate',
         theme: AppTheme.lightTheme,
-        home: const HomeScreen(),
+        home: HomeScreen(),
         debugShowCheckedModeBanner: false,
       ),
     );
