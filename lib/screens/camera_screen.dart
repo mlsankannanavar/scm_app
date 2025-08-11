@@ -193,7 +193,6 @@ class _CameraScreenState extends State<CameraScreen> {
           if (mounted) {
             setState(() => _statusMessage = 'Capture cancelled');
           }
-          }
           DebugScreen.addLog('MOBILE_OCR: User cancelled quantity input');
         }
       } else {
