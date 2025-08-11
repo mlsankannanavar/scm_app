@@ -92,6 +92,22 @@ class ApiService {
     return await _post('/api/submit', payload);
   }
 
+  Future<http.Response> submitDirectResult(Map<String, dynamic> payload) async {
+    print('📱 MOBILE_OCR: Submitting direct result with payload keys: ${payload.keys.toList()}');
+    print('📱 Session ID: ${payload['sessionId']}');
+    print('📱 Batch Number: ${payload['batchNumber']}');
+    print('📱 Quantity: ${payload['quantity']}');
+    print('📱 Confidence: ${payload['confidence']}');
+    
+    DebugScreen.addLog('MOBILE_OCR: Submitting direct batch result...');
+    DebugScreen.addLog('MOBILE_OCR: Session: ${payload['sessionId']}');
+    DebugScreen.addLog('MOBILE_OCR: Batch: ${payload['batchNumber']}');
+    DebugScreen.addLog('MOBILE_OCR: Quantity: ${payload['quantity']}');
+    DebugScreen.addLog('MOBILE_OCR: Source: ${payload['source']}');
+    
+    return await _post('/api/submit', payload);
+  }
+
   Future<Map<String, dynamic>> getStatus(String sessionId) async {
     final r = await _get('/api/status/$sessionId');
     return jsonDecode(r.body) as Map<String, dynamic>;

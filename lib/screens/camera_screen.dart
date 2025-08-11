@@ -6,6 +6,8 @@ import '../providers/session_provider.dart';
 import '../providers/connection_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/camera_service.dart';
+import '../services/local_ocr_service.dart';
+import '../services/local_batch_database_service.dart';
 import '../utils/image_utils.dart';
 import '../models/capture_data.dart';
 import '../services/api_service.dart';
@@ -62,92 +64,124 @@ class _CameraScreenState extends State<CameraScreen> {
         _statusMessage = 'Capturing image...';
       });
     }
-    DebugScreen.addLog('CAPTURE: Started image capture for session: $session');
+    DebugScreen.addLog('MOBILE_OCR: Started local image capture for session: $session');
     
     try {
-      print('Starting image capture...');
-      DebugScreen.addLog('CAPTURE: Calling camera service...');
+      print('🔍 Starting LOCAL OCR image capture...');
+      DebugScreen.addLog('MOBILE_OCR: Calling camera service...');
       final file = await _cameraService.takePicture();
-      print('Image captured: ${file.path}');
-      DebugScreen.addLog('CAPTURE: Image saved to ${file.path}');
+      print('📸 Image captured: ${file.path}');
+      DebugScreen.addLog('MOBILE_OCR: Image saved to ${file.path}');
       
+      // Step 1: LOCAL OCR Processing
       if (mounted) {
-        setState(() => _statusMessage = 'Processing image...');
+        setState(() => _statusMessage = 'Processing with local OCR...');
       }
-      DebugScreen.addLog('CAPTURE: Starting image optimization...');
-      final optimized = await optimizeImage(File(file.path));
-      print('Image optimized, size: ${optimized.length} characters');
-      DebugScreen.addLog('CAPTURE: Image optimized, base64 length: ${optimized.length}');
+      DebugScreen.addLog('MOBILE_OCR: Starting local OCR text extraction...');
       
-      final captureId = _generateCaptureId();
-      DebugScreen.addLog('CAPTURE: Generated capture ID: $captureId');
+      final ocrService = LocalOcrService();
+      final extractedText = await ocrService.extractTextFromImage(File(file.path));
+      print('🔍 LOCAL OCR extracted text: ${extractedText.substring(0, extractedText.length > 100 ? 100 : extractedText.length)}...');
+      DebugScreen.addLog('MOBILE_OCR: Extracted text length: ${extractedText.length} characters');
       
-      // Step 1: Submit initial image (like web app)
+      // Step 2: Batch Number Matching
       if (mounted) {
-        setState(() => _statusMessage = 'Sending image to server...');
+        setState(() => _statusMessage = 'Finding batch matches...');
       }
-      DebugScreen.addLog('API: Submitting initial image (web app step 1)...');
+      DebugScreen.addLog('MOBILE_OCR: Starting batch number matching...');
       
-      final initialCapture = CaptureData(
-        captureId: captureId,
-        sessionId: session,
-        imageBase64: optimized,
-        timestamp: DateTime.now(),
-      );
+      final batchDb = LocalBatchDatabaseService();
+      final sessionBatches = await batchDb.getBatchesForSession(session);
+      final matchResult = await ocrService.findBestBatchMatch(extractedText, sessionBatches);
       
-      final initialResponse = await _api.submitImage(initialCapture.toInitialJson());
-      DebugScreen.addLog('API: Initial image submission - Response: ${initialResponse.statusCode}');
-      
-      // Step 2: Get quantity from user
-      if (mounted) {
-        setState(() => _statusMessage = 'Enter quantity...');
-      }
-      DebugScreen.addLog('CAPTURE: Showing quantity dialog...');
-      final quantity = await _showQuantityDialog();
-      
-      if (quantity != null) {
-        // Step 3: Submit final data with quantity (like web app final submit)
+      if (matchResult.batchNumber.isNotEmpty) {
+        DebugScreen.addLog('MOBILE_OCR: ✅ Batch matched: ${matchResult.batchNumber} (confidence: ${matchResult.confidence.toStringAsFixed(2)})');
+        print('✅ Batch matched: ${matchResult.batchNumber}');
+        
+        // Step 3: Get quantity from user
         if (mounted) {
-          setState(() => _statusMessage = 'Submitting final data...');
+          setState(() => _statusMessage = 'Enter quantity for ${matchResult.batchNumber}...');
         }
-        DebugScreen.addLog('CAPTURE: Quantity entered: ${quantity.isEmpty ? 'None' : quantity}');
-        DebugScreen.addLog('API: Submitting final data with quantity (web app step 2)...');
+        DebugScreen.addLog('MOBILE_OCR: Showing quantity dialog for batch: ${matchResult.batchNumber}');
         
-        final finalCapture = CaptureData(
-          captureId: captureId,
-          sessionId: session,
-          imageBase64: optimized,
-          timestamp: DateTime.now(), // Fresh timestamp for final submission
-          quantity: quantity.isEmpty ? null : quantity,
-        );
+        final quantity = await _showQuantityDialog(batchNumber: matchResult.batchNumber);
         
-        final finalResponse = await _api.submitImage(finalCapture.toFinalJson());
-        DebugScreen.addLog('API: Final submission - Response: ${finalResponse.statusCode}');
-        DebugScreen.addLog('API: Final response body: ${finalResponse.body}');
-        
-        if (mounted) {
-          setState(() => _statusMessage = 'Success! ID: $captureId');
-        }
-        DebugScreen.addLog('CAPTURE: ✅ COMPLETE - Capture $captureId submitted successfully');
-        
-        // Auto-clear status after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () {
+        if (quantity != null && quantity.isNotEmpty) {
+          // Step 4: Submit ONLY the result to backend (not the image)
           if (mounted) {
-            setState(() => _statusMessage = null);
+            setState(() => _statusMessage = 'Submitting batch result...');
           }
-        });
+          DebugScreen.addLog('MOBILE_OCR: Quantity entered: $quantity');
+          DebugScreen.addLog('MOBILE_OCR: Submitting final result to backend...');
+          
+          final captureId = _generateCaptureId();
+          final directSubmissionData = {
+            'sessionId': session,
+            'batchNumber': matchResult.batchNumber,
+            'quantity': quantity,
+            'directSubmission': true,
+            'captureId': captureId,
+            'confidence': matchResult.confidence,
+            'extractedText': extractedText.substring(0, extractedText.length > 500 ? 500 : extractedText.length),
+            'timestamp': DateTime.now().toIso8601String(),
+            'source': 'mobile_local_ocr',
+          };
+          
+          final response = await _api.submitDirectResult(directSubmissionData);
+          DebugScreen.addLog('MOBILE_OCR: Direct submission - Response: ${response.statusCode}');
+          DebugScreen.addLog('MOBILE_OCR: Response body: ${response.body}');
+          
+          // Step 5: Store locally and show success
+          await batchDb.storeCaptureRecord(
+            session, 
+            matchResult.batchNumber, 
+            quantity, 
+            captureId,
+            confidence: matchResult.confidence,
+          );
+          
+          if (mounted) {
+            setState(() => _statusMessage = '✅ Success: ${matchResult.batchNumber} (Qty: $quantity)');
+            // Return the batch number to the calling screen
+            Navigator.of(context).pop(matchResult.batchNumber);
+          }
+          DebugScreen.addLog('MOBILE_OCR: ✅ COMPLETE - Local OCR batch ${matchResult.batchNumber} processed successfully');
+          
+        } else {
+          if (mounted) {
+            setState(() => _statusMessage = 'Capture cancelled');
+          }
+          DebugScreen.addLog('MOBILE_OCR: User cancelled quantity input');
+        }
       } else {
+        // No batch match found
+        DebugScreen.addLog('MOBILE_OCR: ❌ No batch number matched from extracted text');
         if (mounted) {
-          setState(() => _statusMessage = 'Capture cancelled');
+          setState(() => _statusMessage = 'No batch number found in image');
         }
-        DebugScreen.addLog('CAPTURE: User cancelled quantity input');
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            setState(() => _statusMessage = null);
-          }
-        });
+        
+        // Show extracted text to user for debugging
+        await _showNoMatchDialog(extractedText);
       }
+      
     } catch (e) {
+      print('❌ LOCAL OCR Error: $e');
+      DebugScreen.addLog('MOBILE_OCR: ❌ Error during local OCR processing: $e');
+      if (mounted) {
+        setState(() => _statusMessage = 'Error: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+      // Auto-clear status after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() => _statusMessage = null);
+        }
+      });
+    }
+  }
       print('Error during capture/submit: $e');
       DebugScreen.addLog('ERROR: Capture failed - ${e.toString()}');
       
@@ -180,7 +214,7 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<String?> _showQuantityDialog() async {
+  Future<String?> _showQuantityDialog({String? batchNumber}) async {
     final TextEditingController quantityController = TextEditingController();
     
     return showDialog<String>(
@@ -189,11 +223,46 @@ class _CameraScreenState extends State<CameraScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.inventory, color: Theme.of(context).primaryColor),
-              const SizedBox(width: 8),
-              const Text('Enter Quantity'),
+              Row(
+                children: [
+                  Icon(Icons.inventory, color: Theme.of(context).primaryColor),
+                  const SizedBox(width: 8),
+                  const Text('Enter Quantity'),
+                ],
+              ),
+              if (batchNumber != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: AppTheme.successColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Batch: $batchNumber',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.successColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           content: Column(
@@ -248,6 +317,68 @@ class _CameraScreenState extends State<CameraScreen> {
                 foregroundColor: Colors.white,
               ),
               child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showNoMatchDialog(String extractedText) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber, color: AppTheme.warningColor),
+              const SizedBox(width: 8),
+              const Text('No Batch Found'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'No batch number could be identified in the captured image.',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Extracted text:',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Text(
+                  extractedText.isNotEmpty 
+                      ? extractedText.substring(0, extractedText.length > 200 ? 200 : extractedText.length)
+                      : 'No text detected',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tips: Ensure the batch label is clearly visible and well-lit.',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Try Again'),
             ),
           ],
         );
