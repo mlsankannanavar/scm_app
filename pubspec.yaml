@@ -24,18 +24,18 @@ dependencies:
   # Material 3
   flutter_material_color_picker: ^1.1.0
   
-  # NEW: Google ML Kit for local OCR
-  google_mlkit_text_recognition: ^0.10.0
+  # NEW: Google ML Kit for local OCR (commented out for build fix)
+  # google_mlkit_text_recognition: ^0.10.0
   
-  # NEW: Local database for batch storage
-  sqflite: ^2.3.0
-  path: ^1.8.3
+  # NEW: Local database for batch storage (commented out for build fix)
+  # sqflite: ^2.3.0
+  # path: ^1.8.3
   
-  # NEW: String similarity for fuzzy matching
-  string_similarity: ^2.0.0
+  # NEW: String similarity for fuzzy matching (commented out for build fix)
+  # string_similarity: ^2.0.0
   
-  # NEW: Date formatting
-  intl: ^0.18.1
+  # NEW: Date formatting (commented out for build fix)
+  # intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:

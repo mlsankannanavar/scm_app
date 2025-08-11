@@ -1,51 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/local_batch_data.dart';
-import '../services/session_data_service.dart';
-
-enum SessionDataStatus {
-  idle,
-  downloading,
-  ready,
-  error,
-}
 
 class SessionProvider extends ChangeNotifier {
   String? _sessionId;
   bool _loading = false;
-  SessionDataStatus _dataStatus = SessionDataStatus.idle;
-  SessionBatchData? _sessionData;
-  String? _errorMessage;
-  int _totalBatches = 0;
 
-  final SessionDataService _sessionDataService = SessionDataService();
-
-  // Getters
   String? get sessionId => _sessionId;
   bool get loading => _loading;
-  SessionDataStatus get dataStatus => _dataStatus;
-  SessionBatchData? get sessionData => _sessionData;
-  String? get errorMessage => _errorMessage;
-  int get totalBatches => _totalBatches;
-  bool get hasSessionData => _sessionData != null && _sessionData!.batches.isNotEmpty;
-
-  // Status helpers
-  bool get isDownloading => _dataStatus == SessionDataStatus.downloading;
-  bool get isReady => _dataStatus == SessionDataStatus.ready;
-  bool get hasError => _dataStatus == SessionDataStatus.error;
 
   Future<void> loadSavedSession() async {
     _loading = true;
     notifyListeners();
-    
     final prefs = await SharedPreferences.getInstance();
     _sessionId = prefs.getString('sessionId');
-    
-    // If we have a session ID, check for local batch data
-    if (_sessionId != null && _sessionId!.isNotEmpty) {
-      await _loadLocalSessionData();
-    }
-    
     _loading = false;
     notifyListeners();
   }
@@ -54,20 +21,16 @@ class SessionProvider extends ChangeNotifier {
     _sessionId = id;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('sessionId', id);
-    
-    // Clear previous session data
-    _sessionData = null;
-    _dataStatus = SessionDataStatus.idle;
-    _errorMessage = null;
-    _totalBatches = 0;
-    
     notifyListeners();
-    
-    // Download batch data for this session
-    await downloadSessionData();
   }
 
   Future<void> clearSession() async {
+    _sessionId = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('sessionId');
+    notifyListeners();
+  }
+}
     final oldSessionId = _sessionId;
     
     _sessionId = null;
