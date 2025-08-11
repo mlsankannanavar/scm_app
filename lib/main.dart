@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/session_provider.dart';
 import 'providers/connection_provider.dart';
-import 'screens/home_screen_simple.dart' as home;
+import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -22,7 +22,7 @@ class BatchMateApp extends StatelessWidget {
       child: MaterialApp(
         title: 'BatchMate',
         theme: AppTheme.lightTheme,
-        home: const home.HomeScreen(),
+        home: const HomeScreen(),
         debugShowCheckedModeBanner: false,
       ),
     );
